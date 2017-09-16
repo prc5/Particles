@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html>
+    <head>
+        <title>Three.js</title> 
+        <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">     
+		<style>
+			html {width:100vw; height: 100vh; background-color: black; position:relative}
+            body,canvas {width: 100vw; height: 100vh; margin:0px 0px!important; position:absolute}
+		</style>
+    </head>
+<body>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/85/three.min.js"></script>
+    <script src="GeometryUtils.js"></script>
+    <script>
+		var scene = new THREE.Scene();
+		var camera = new THREE.PerspectiveCamera( 100, window.innerWidth/window.innerHeight, 60, 5000 );
+        
+		var renderer = new THREE.WebGLRenderer({antialias:true});
+		renderer.setSize( window.innerWidth, window.innerHeight);
+		document.body.appendChild( renderer.domElement );
+        
+        // Controll
+        
+        var particleCount = 50000,       
+            speed = 100,   // How fast animation plays
+            scale = 150,   // Scale of generated shape
+            vertex = 30,    // Shape details
+            shapeRotation = 0.001, // Rotation speed
+            opacityControll = 0.8,  // Opacity of particles
+            sizeControll = 1,   // Size of particles
+            fps = 30,      // Fps controll 
+            texture = new THREE.TextureLoader().load( 'particle.png' );
+            camera.position.z = 280; // Camera position
+        
+        // Particle
+        var particles = new THREE.Geometry(),
+            pMaterial = new THREE.PointsMaterial({
+              color: 0xdddddd,
+              size: sizeControll, 
+              map: texture,
+              blending: THREE.AdditiveBlending,
+              transparent: true,
+              opacity: opacityControll,
+              alphaTest: 0.1
+            });
+                
+        
+        // Rounding function
+        
+        function Round(n, k) {
+            var factor = Math.pow(10, k);
+            return Math.round(n*factor)/factor;
+        };
+
+        // Create the individual particles
+        for (var p = 0; p < particleCount; p++) {
+
+          // Create a particle with random
+          // Position values, -250 -> 250
+          var pX = Math.random() * (window.innerWidth*2) - window.innerWidth,
+              pY = Math.random() * (window.innerHeight*2) - window.innerHeight,
+              pZ = Math.random() * (window.innerWidth*2) - window.innerWidth,
+              particle = new THREE.Vector3(pX, pY, pZ);
+
+          // Add it to the geometry
+          particles.vertices.push(particle);
+        }
+        
+
+        // Create the particle system
+        var particleSystem = new THREE.Points(
+            particles,
+            pMaterial);
+
+        // Add it to the scene
+        scene.add(particleSystem);
+        
+        // Light
+        var light = new THREE.HemisphereLight( 0xffffbb, 0x080820, 1 );
+        scene.add( light );
+        
+        
+        // Shape's geometries
+        
+        var geometry = new THREE.SphereGeometry( scale, vertex, vertex );
+        var geometry1 = new THREE.TorusKnotGeometry( scale, 10, 120, 20 );        
+        
+        
+        // Arrays of particles
+    
+        var arr = [];
+        var diff = [];
+        var facesArr = [];
+        
+        // Build shape
+        function buildShape(geo, animationSpeed) {   
+            arr = [];
+            diff = [];            
+            facesArr = [];            
+            
+            var randomPointPositions = THREE.GeometryUtils.randomPointsInGeometry( geo, particleCount );
+            geo.computeBoundingBox();
+            
+            // Array of random points
+            for( var i = 0; i < particleCount; i++ ){  
+                arr.push(randomPointPositions[i]);         
+            }
+        
+            // Array of position difference
+            diff = arr.map(function(el, key){
+                var current = {};
+                current.x = (el.x - particles.vertices[key].x)/animationSpeed;
+                current.y = (el.y - particles.vertices[key].y)/animationSpeed;
+                current.z = (el.z - particles.vertices[key].z)/animationSpeed;
+                return current;
+            });   
+        };
+                
+        
+        // Function for animating shape
+        
+        var movingArr = [];
+        var movingArr1 = [];
+        var partMove = 0.025;
+        
+        function moveParticles(){
+            var leftTop = {x : -partMove,
+                           y : partMove};
+            var rightTop = {x : partMove,
+                            y : partMove};
+            var rightBottom = {x : partMove,
+                                y : -partMove};
+            var leftBottom = {x : -partMove,
+                              y : -partMove}
+            for(i=0; i<20; i++) {
+                i<5 ? movingArr.push(leftTop) : partMove;
+                i>=5 && i<10 ? movingArr.push(rightTop) : partMove;
+                i>=10 && i<15 ? movingArr.push(rightBottom) : partMove;  
+                i>=15 && i<20 ? movingArr.push(leftBottom)  : partMove; 
+                i<5 ? movingArr1.push(rightBottom) : partMove;
+                i>=5 && i<10 ? movingArr1.push(leftBottom) : partMove;
+                i>=10 && i<15 ? movingArr1.push(leftTop) : partMove;  
+                i>=15 && i<20 ? movingArr1.push(rightTop)  : partMove; 
+            }            
+        }        
+        moveParticles();
+        
+        var counter = 0; // 0 for animating shape, 1 for animate vertices 
+        var animations = 0;
+        
+        function animateShape(){            
+            for( var i = 0; i < particleCount; i++ ){
+                var element = particles.vertices[i];
+                  
+                var rounded = Round(element.x, 10) !== Round(arr[i].x, 10);
+                
+                if (rounded === true && counter == 0) {
+                    element.x += diff[i].x;
+                    element.y += diff[i].y;
+                    element.z += diff[i].z;
+                }
+                else if (counter == 1){
+                    if (animations < 20){
+                        if (i%2){
+                            element.x += movingArr[animations].x;
+                            element.y += movingArr[animations].y;
+                        }
+                        else {
+                            element.x += movingArr1[animations].x;
+                            element.y += movingArr1[animations].y;
+                        }
+                    }
+                    else {
+                        animations = -1;
+                        break;
+                    }
+                }
+                else {  
+                    counter = 1;
+                    break;
+                }  
+            };
+            animations++;
+            particles.dynamic = true;
+            particles.verticesNeedUpdate = true;
+        };
+        
+        // Allow to change position
+        particleSystem.sortParticles = true;    
+        
+        // First call of  build shape
+        
+        buildShape(geometry, speed);              
+    
+        
+        
+        // Animate 
+
+        var now;
+        var then = Date.now();
+        var interval = 1000/fps;
+        var delta;
+           
+        function animate() {
+            requestAnimationFrame(animate);
+
+            now = Date.now();
+            delta = now - then;
+
+            if (delta > interval) {
+                then = now - (delta % interval);
+                particleSystem.rotation.x += shapeRotation;
+                particleSystem.rotation.y += shapeRotation;
+                particleSystem.rotation.z += shapeRotation;
+                animateShape();
+                renderer.render(scene, camera);
+            }
+        }
+        animate();
+        
+    </script>
+</body>
+</html>
